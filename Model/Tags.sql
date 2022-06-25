@@ -1,0 +1,5 @@
+CREATE TABLE tags(
+    id BIGSERIAL PRIMARY KEY NOT NULL,
+    word VARCHAR NOT NULL,
+    count BIGINT
+);
