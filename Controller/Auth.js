@@ -58,7 +58,6 @@ class AuthController {
     pool
       .query(query, [username, email, hashedPassword])
       .then(() => {
-        console.log("fine");
         this.sendVerificationEmail({ username, email }, transporter);
 
         return response
@@ -113,7 +112,6 @@ class AuthController {
   }
 
   sendVerificationEmail(user, transporter) {
-    console.log(user);
     const newId = uuidv4();
     const token_payload = {
       username: user.username,

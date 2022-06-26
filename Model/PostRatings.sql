@@ -1,0 +1,6 @@
+CREATE TABLE postratings (
+  id BIGSERIAL PRIMARY KEY NOT NULL,
+  postId BIGINT NOT NULL REFERENCES posts(id),
+  username VARCHAR(50) NOT NULL UNIQUE REFERENCES users(username),
+  rating INT NOT NULL
+);
