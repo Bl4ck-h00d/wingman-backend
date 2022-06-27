@@ -2,6 +2,7 @@ const Router = require("express");
 const { PostController } = require("../Controller/Post");
 const { uploadFile, getFileStream } = require("../Config/S3");
 const { Authenticate } = require("../Middleware/Auth");
+const { GetToken } = require("../Middleware/GetToken");
 const multer = require("multer");
 const upload = multer({ dest: "Uploads/" });
 const { verify } = require("jsonwebtoken");
@@ -25,21 +26,28 @@ router.post(
   }
 );
 
-router.get("/api/get-posts", (request, response) => {
-  const token = request.header("authorization").split(" ")[1];
-
-  verify(token, process.env.cookie_secret, (error, decoded) => {
-    if (error) {
-      request.token = null;
-    } else {
-      request.token = decoded;
-    }
-  });
+router.get("/api/get-posts", GetToken, (request, response) => {
   Controller.getPosts(request, response);
 });
 
 router.put("/api/ratings/:id", Authenticate, (request, response) => {
-  Controller.updateRating(request, response);
+  Controller.updatePostRating(request, response);
+});
+
+router.delete("/api/delete-post/:id", Authenticate, (request, response) => {
+  Controller.deletePost(request, response);
+});
+
+router.get("/api/post/:id", GetToken, (request, response) => {
+  Controller.getPostById(request, response);
+});
+
+router.post("/api/comments", Authenticate, (request, response) => {
+  Controller.postComment(request, response);
+});
+
+router.put("/api/comments/ratings/:id", Authenticate, (request, response) => {
+  Controller.updateCommentRating(request, response);
 });
 
 module.exports = router;

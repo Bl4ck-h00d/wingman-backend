@@ -1,0 +1,8 @@
+CREATE TABLE commentratings (
+  id BIGSERIAL PRIMARY KEY NOT NULL,
+  commentId BIGINT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+  postid BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  username VARCHAR(50) NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+  rating INT NOT NULL,
+  UNIQUE(commentId,username)
+);

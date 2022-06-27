@@ -1,9 +1,11 @@
 CREATE TABLE comments(
     id BIGSERIAL PRIMARY KEY NOT NULL,
     comment VARCHAR(1000) NOT NULL,
-    author VARCHAR(50) REFERENCES users(username),
+    author VARCHAR(50) REFERENCES users(username) ON DELETE CASCADE,
     anonymous BOOLEAN DEFAULT FALSE,
-    upvotes text[],
-    downvotes text[],
-    postId BIGSERIAL REFERENCES posts(id)
+    ratings BIGINT DEFAULT 0,
+    postId BIGINT REFERENCES posts(id) ON DELETE CASCADE,
+    timestamp VARCHAR(50) NOT NULL
 );
+
+
