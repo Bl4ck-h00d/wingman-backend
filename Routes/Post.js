@@ -50,4 +50,12 @@ router.put("/api/comments/ratings/:id", Authenticate, (request, response) => {
   Controller.updateCommentRating(request, response);
 });
 
+router.put("/api/update-comment/:id", Authenticate, (request, response) => {
+  Controller.updateComment(request, response);
+});
+
+router.delete("/api/delete-comment/:id", Authenticate, (request, response) => {
+  Controller.deleteComment(request, response);
+});
+
 module.exports = router;

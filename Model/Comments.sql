@@ -5,6 +5,7 @@ CREATE TABLE comments(
     anonymous BOOLEAN DEFAULT FALSE,
     ratings BIGINT DEFAULT 0,
     postId BIGINT REFERENCES posts(id) ON DELETE CASCADE,
+    edited BOOLEAN DEFAULT FALSE,
     timestamp VARCHAR(50) NOT NULL
 );
 

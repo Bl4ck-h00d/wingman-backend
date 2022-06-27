@@ -125,13 +125,12 @@ class PostController {
     const userVote = request.body.userVote;
     const postId = request.body.postId;
 
-
     try {
       //Update postratings table
       let query =
         "INSERT INTO commentratings(commentId,username,rating,postid) VALUES ($1,$2,$3,$4) ON CONFLICT (commentid,username) DO UPDATE SET rating = EXCLUDED.rating";
 
-      await pool.query(query, [commentId, username, userVote,postId]);
+      await pool.query(query, [commentId, username, userVote, postId]);
 
       //Update post table
       query =
@@ -222,6 +221,32 @@ class PostController {
     }
   }
 
+  async deleteComment(request, response) {
+    const tokenPayload = request.token;
+    const commentId = request.params.id;
+    const username = tokenPayload.username;
+
+    const checkQuery =
+      "SELECT * FROM comments WHERE comments.id=$1 AND comments.author=$2";
+
+    const commentExists = (await pool.query(checkQuery, [commentId, username]))
+      .rows[0];
+
+    if (!commentExists) {
+      return response.status(400).json({ msg: "INVALID OPERATION" });
+    }
+
+    const query = "DELETE FROM comments WHERE comments.id=$1";
+
+    try {
+      await pool.query(query, [commentId]);
+      return response.status(201).json({ msg: "Comment Deleted" });
+    } catch (error) {
+      console.log(error);
+      return response.status(500).json(error);
+    }
+  }
+
   async getComments(request, response) {
     const tokenPayload = request.token;
     const postId = request.params.id;
@@ -280,6 +305,26 @@ class PostController {
         console.log(error);
         return response.status(500).json({ type: "error", msg: error });
       });
+  }
+
+  async updateComment(request, response) {
+    const tokenPayload = request.token;
+    const author = tokenPayload.username;
+
+    let { commentId, anonymous, postId, comment } = request.body;
+
+    const query =
+      "UPDATE comments SET comment=$1, anonymous=$2, edited=true WHERE comments.id=$3";
+
+    try {
+      await pool.query(query, [comment, anonymous, commentId]);
+      return response
+        .status(201)
+        .json({ type: "success", msg: "Comment updated succesfully" });
+    } catch (error) {
+      console.log(error);
+      return response.status(500).json(error);
+    }
   }
 }
 
