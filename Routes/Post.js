@@ -42,6 +42,15 @@ router.get("/api/post/:id", GetToken, (request, response) => {
   Controller.getPostById(request, response);
 });
 
+router.put(
+  "/api/update-post/:id",
+  Authenticate,
+  upload.any("images"),
+  (request, response) => {
+    Controller.updatePost(request, response);
+  }
+);
+
 router.post("/api/comments", Authenticate, (request, response) => {
   Controller.postComment(request, response);
 });

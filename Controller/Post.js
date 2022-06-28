@@ -311,7 +311,7 @@ class PostController {
     const tokenPayload = request.token;
     const author = tokenPayload.username;
 
-    let { commentId, anonymous, postId, comment } = request.body;
+    const { commentId, anonymous, postId, comment } = request.body;
 
     const query =
       "UPDATE comments SET comment=$1, anonymous=$2, edited=true WHERE comments.id=$3";
@@ -321,6 +321,50 @@ class PostController {
       return response
         .status(201)
         .json({ type: "success", msg: "Comment updated succesfully" });
+    } catch (error) {
+      console.log(error);
+      return response.status(500).json(error);
+    }
+  }
+
+  async updatePost(request, response) {
+    const tokenPayload = request.token;
+    const postId = request.params.id;
+    const author = tokenPayload.username;
+    const files = request.files;
+
+    let { title, description, tags, anonymous } = request.body;
+
+    tags = [...tags.split(",")];
+    anonymous = anonymous === "true" ? true : false;
+
+    const images = await Promise.all(
+      files.map(async (file, _) => {
+        const result = await uploadFile(file);
+        return "/api/images/" + result.key;
+      })
+    );
+
+    files.forEach(async (file, _) => {
+      await unlinkFile(file.path);
+    });
+
+    const query =
+      "UPDATE posts SET title=$1, description=$2, anonymous=$3, tags=$4, media=media||$5, edited=true WHERE posts.id=$6 AND author=$7";
+
+    try {
+      await pool.query(query, [
+        title,
+        description,
+        anonymous,
+        tags,
+        images,
+        postId,
+        author,
+      ]);
+      return response
+        .status(201)
+        .json({ type: "success", msg: "Post updated succesfully" });
     } catch (error) {
       console.log(error);
       return response.status(500).json(error);
