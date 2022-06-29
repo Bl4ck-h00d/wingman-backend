@@ -59,7 +59,7 @@ class PostController {
   async getPosts(request, response) {
     try {
       const query =
-        "SELECT posts.id, posts.media, posts.title,posts.description,posts.timestamp,posts.tags,posts.anonymous,posts.ratings, CASE WHEN posts.anonymous=true THEN NULL ELSE users.username END, COUNT(comments.comment) AS comments FROM posts INNER JOIN users ON posts.author=users.username LEFT JOIN comments ON posts.id=comments.postId GROUP BY posts.id, users.username";
+        "SELECT posts.id, posts.media,posts.edited, posts.title,posts.description,posts.timestamp,posts.tags,posts.anonymous,posts.ratings, CASE WHEN posts.anonymous=true THEN NULL ELSE users.username END, COUNT(comments.comment) AS comments FROM posts INNER JOIN users ON posts.author=users.username LEFT JOIN comments ON posts.id=comments.postId GROUP BY posts.id, users.username";
 
       let data = (await pool.query(query)).rows;
 
@@ -77,6 +77,14 @@ class PostController {
           await pool.query(postsLikedByUserQuery, [username])
         ).rows;
         data = [...data, { postsLiked: postsLikedByUserData }];
+
+        const postsSavedByUserQuery =
+          "SELECT savedpost.postid AS postid, savedpost.username FROM savedpost WHERE savedpost.username=$1";
+
+        const postsSavedByUserData = (
+          await pool.query(postsSavedByUserQuery, [username])
+        ).rows;
+        data = [...data, { postsSaved: postsSavedByUserData }];
       }
 
       return response.status(200).json(data);
@@ -155,7 +163,8 @@ class PostController {
     const postId = request.params.id;
 
     try {
-      const query = "SELECT * FROM posts WHERE posts.id=$1";
+      const query =
+        "SELECT id,media,title,description,CASE WHEN anonymous=true THEN NULL ELSE author END,anonymous,tags,ratings,timestamp,edited FROM posts WHERE id=$1";
 
       const post = (await pool.query(query, [postId])).rows;
 
@@ -180,6 +189,19 @@ class PostController {
           data = [...data, { userRating: userRating.rating }];
         } else {
           data = [...data, { userRating: 0 }];
+        }
+
+        const postSavedByUserQuery =
+          "SELECT savedpost.postid FROM savedpost WHERE savedpost.username=$1 AND savedpost.postid=$2";
+
+        const postSavedByUserData = (
+          await pool.query(postSavedByUserQuery, [username, postId])
+        ).rows[0];
+
+        if (!postSavedByUserData) {
+          data = [...data, { postSaved: false }];
+        } else {
+          data = [...data, { postSaved: true }];
         }
       }
 
@@ -254,7 +276,7 @@ class PostController {
 
     //Get all the comments on a post
     const query =
-      "SELECT comments.id,comments.comment,comments.anonymous,comments.timestamp,comments.ratings, CASE WHEN comments.anonymous=true THEN NULL ELSE comments.author END FROM comments WHERE comments.postid=$1";
+      "SELECT comments.id,comments.comment,comments.anonymous,comments.timestamp,comments.edited,comments.ratings, CASE WHEN comments.anonymous=true THEN NULL ELSE comments.author END FROM comments WHERE comments.postid=$1";
 
     try {
       let data = (await pool.query(query, [postId])).rows;
@@ -365,6 +387,63 @@ class PostController {
       return response
         .status(201)
         .json({ type: "success", msg: "Post updated succesfully" });
+    } catch (error) {
+      console.log(error);
+      return response.status(500).json(error);
+    }
+  }
+
+  async savePost(request, response) {
+    const tokenPayload = request.token;
+    const postId = request.params.id;
+    const username = tokenPayload.username;
+    const { savePost } = request.body;
+
+    if (savePost) {
+      const query = "INSERT INTO savedpost (postid,username) VALUES ($1, $2)";
+
+      try {
+        await pool.query(query, [postId, username]);
+        return response
+          .status(201)
+          .json({ type: "success", msg: "Post saved succesfully" });
+      } catch (error) {
+        console.log(error);
+        return response.status(500).json(error);
+      }
+    } else {
+      const checkQuery =
+        "SELECT * FROM savedpost WHERE savedpost.postid=$1 AND savedpost.username=$2";
+
+      const postExists = (await pool.query(checkQuery, [postId, username]))
+        .rows[0];
+
+      if (!postExists) {
+        return response.status(400).json({ msg: "INVALID OPERATION" });
+      }
+
+      const query = "DELETE FROM savedpost WHERE savedpost.postid=$1";
+
+      try {
+        await pool.query(query, [postId]);
+        return response.status(201).json({ msg: "Post removed from bookmark" });
+      } catch (error) {
+        console.log(error);
+        return response.status(500).json(error);
+      }
+    }
+  }
+
+  async searchPost(request, response) {
+    let { searchQuery } = request.body;
+
+    const query =
+      "SELECT * FROM posts WHERE search_document_with_weights @@ to_tsquery('english',$1)";
+
+    try {
+      let data = (await pool.query(query, [searchQuery + ":*"])).rows;
+
+      return response.status(201).json(data);
     } catch (error) {
       console.log(error);
       return response.status(500).json(error);

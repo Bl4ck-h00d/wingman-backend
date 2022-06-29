@@ -7,5 +7,7 @@ CREATE TABLE posts(
     anonymous BOOLEAN DEFAULT FALSE,
     tags text[],
     ratings BIGINT NOT NULL DEFAULT 0,
-    timestamp VARCHAR(50) NOT NULL
+    timestamp VARCHAR(50) NOT NULL,
+    edited BOOLEAN DEFAULT FALSE,
+    search_document_with_weights tsvector
 );

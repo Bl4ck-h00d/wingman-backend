@@ -67,4 +67,12 @@ router.delete("/api/delete-comment/:id", Authenticate, (request, response) => {
   Controller.deleteComment(request, response);
 });
 
+router.post("/api/save/:id", Authenticate, (request, response) => {
+  Controller.savePost(request, response);
+});
+
+router.post("/api/search", (request, response) => {
+  Controller.searchPost(request, response);
+});
+
 module.exports = router;
