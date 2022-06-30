@@ -1,0 +1,8 @@
+CREATE TABLE anonymousposts(
+    id BIGSERIAL PRIMARY KEY NOT NULL,
+    author VARCHAR(50) REFERENCES users(username) ON DELETE CASCADE,
+    postId BIGINT REFERENCES posts(id) ON DELETE CASCADE,
+    timestamp VARCHAR(50) NOT NULL
+);
+
+

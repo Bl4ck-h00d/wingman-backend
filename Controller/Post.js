@@ -2,15 +2,16 @@ const pool = require("../Config/Database");
 const { uploadFile, getFileStream } = require("../Config/S3");
 const fs = require("fs");
 const util = require("util");
-const { post } = require("../Routes/Post");
+const { post, response } = require("../Routes/Post");
 const unlinkFile = util.promisify(fs.unlink);
 var moment = require("moment");
+require("dotenv").config();
 
 class PostController {
   async createPost(request, response) {
     try {
       const token = request.token;
-      const author = token.username;
+      let author = token.username;
       const files = request.files;
 
       let { title, description, tags, anonymous } = request.body;
@@ -28,28 +29,55 @@ class PostController {
         await unlinkFile(file.path);
       });
       const timestamp = moment.utc().format("ddd MMM DD YYYY HH:mm:ss z");
-      const query =
-        "INSERT INTO posts (media,title,description,author,anonymous,tags,timestamp) VALUES ($1,$2,$3,$4,$5,$6,$7)";
 
-      pool
-        .query(query, [
+      let anonymousUsername = process.env.ANONYMOUS_USER;
+
+      const query =
+        "INSERT INTO posts (media,title,description,author,anonymous,tags,timestamp) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id";
+
+      try {
+        const data = await pool.query(query, [
           images,
           title,
           description,
-          author,
+          anonymous ? anonymousUsername : author,
           anonymous,
           tags,
           timestamp,
-        ])
-        .then(() => {
-          return response
-            .status(201)
-            .json({ type: "success", msg: "Post created succesfully" });
-        })
-        .catch((error) => {
-          console.log(error);
-          return response.status(500).json({ type: "error", msg: error });
-        });
+        ]);
+
+        if (anonymous) {
+          try {
+            const postId = data.rows[0].id;
+            console.log(typeof postId);
+            const query =
+              "INSERT INTO anonymousposts (postId,author,timestamp) VALUES ($1,$2,$3)";
+
+            await pool.query(query, [postId, author, timestamp]);
+          } catch (error) {
+            console.log(error);
+            return response.status(500).json({ type: "error", msg: error });
+          }
+        }
+
+        //Update Tags table
+
+        const tagsQuery =
+          "INSERT INTO tags(word, count) VALUES ($1, 1) ON CONFLICT (word) DO UPDATE SET count = EXCLUDED.count+1; ";
+
+        for (let tag of tags) {
+          if (tag !== "") {
+            await pool.query(tagsQuery, [tag.toLocaleLowerCase()]);
+          }
+        }
+
+        return response
+          .status(201)
+          .json({ type: "success", msg: "Post created succesfully" });
+      } catch (error) {
+        console.log(error);
+        return response.status(500).json({ type: "error", msg: error });
+      }
     } catch (error) {
       console.log(error);
       return response.status(500).json({ type: "error", msg: error });
@@ -272,7 +300,6 @@ class PostController {
   async getComments(request, response) {
     const tokenPayload = request.token;
     const postId = request.params.id;
-    const username = tokenPayload.username;
 
     //Get all the comments on a post
     const query =
@@ -280,7 +307,6 @@ class PostController {
 
     try {
       let data = (await pool.query(query, [postId])).rows;
-
       //Get all the commentIds of the current post which current user has liked
       if (
         request.token !== undefined &&
@@ -296,9 +322,8 @@ class PostController {
           await pool.query(commentsLikedByUserQuery, [username, postId])
         ).rows;
         data = [...data, { commentsLiked: commentsLikedByUserData }];
-
-        return data;
       }
+      return data;
     } catch (error) {
       console.log(error);
       return error;
@@ -384,6 +409,18 @@ class PostController {
         postId,
         author,
       ]);
+
+      //Update Tags table
+
+      const tagsQuery =
+        "INSERT INTO tags(word, count) VALUES ($1, 1) ON CONFLICT (word) DO UPDATE SET count = EXCLUDED.count+1; ";
+
+      for (let tag of tags) {
+        if (tag !== "") {
+          await pool.query(tagsQuery, [tag.toLocaleLowerCase()]);
+        }
+      }
+
       return response
         .status(201)
         .json({ type: "success", msg: "Post updated succesfully" });
@@ -437,16 +474,62 @@ class PostController {
   async searchPost(request, response) {
     let { searchQuery } = request.body;
 
-    const query =
-      "SELECT * FROM posts WHERE search_document_with_weights @@ to_tsquery('english',$1)";
-
     try {
-      let data = (await pool.query(query, [searchQuery + ":*"])).rows;
+      const query =
+        "SELECT posts.id, posts.media,posts.edited, posts.title,posts.description,posts.timestamp,posts.tags,posts.anonymous,posts.ratings, CASE WHEN posts.anonymous=true THEN NULL ELSE users.username END, COUNT(comments.comment) AS comments FROM posts INNER JOIN users ON posts.author=users.username LEFT JOIN comments ON posts.id=comments.postId WHERE posts.search_document_with_weights @@ to_tsquery('english',$1) GROUP BY posts.id, users.username";
 
-      return response.status(201).json(data);
+      searchQuery = searchQuery.split(" ");
+
+      let phraseQuery = "";
+      if (searchQuery.length) {
+        for (let i = 0; i < searchQuery.length - 1; i++) {
+          phraseQuery += searchQuery[i] + " <-> ";
+        }
+        phraseQuery += searchQuery.pop() + ":*";
+      }
+
+      let data = (await pool.query(query, [phraseQuery])).rows;
+
+      if (
+        request.token !== undefined &&
+        request.token !== null &&
+        request.token !== "undefined"
+      ) {
+        const token = request.token;
+        const username = token.username;
+        const postsLikedByUserQuery =
+          "SELECT postratings.postid AS postid, postratings.username, postratings.rating FROM postratings WHERE postratings.username=$1";
+
+        const postsLikedByUserData = (
+          await pool.query(postsLikedByUserQuery, [username])
+        ).rows;
+        data = [...data, { postsLiked: postsLikedByUserData }];
+
+        const postsSavedByUserQuery =
+          "SELECT savedpost.postid AS postid, savedpost.username FROM savedpost WHERE savedpost.username=$1";
+
+        const postsSavedByUserData = (
+          await pool.query(postsSavedByUserQuery, [username])
+        ).rows;
+        data = [...data, { postsSaved: postsSavedByUserData }];
+      }
+
+      return response.status(200).json(data);
     } catch (error) {
       console.log(error);
-      return response.status(500).json(error);
+      return response.status(500).json({ type: "error", msg: error });
+    }
+  }
+
+  async getTags(request, response) {
+    const query = "select word from tags order by count desc limit 15";
+
+    try {
+      const data = (await pool.query(query)).rows;
+      return response.status(200).json(data);
+    } catch (error) {
+      console.log(error);
+      return response.status(500).json({ type: "error", msg: error });
     }
   }
 }

@@ -1,7 +1,8 @@
 const pool = require("../Config/Database");
+require("dotenv").config();
 
-class SetupFullTextSearch {
-  async up() {
+class Migrations {
+  async fullTextSearch() {
     await pool.query(`
     update posts set search_document_with_weights = setweight(to_tsvector(title), 'A') ||
   setweight(to_tsvector(description), 'B') ||
@@ -25,8 +26,20 @@ CREATE TRIGGER tsvectorupdate BEFORE INSERT OR UPDATE
     ON posts FOR EACH ROW EXECUTE PROCEDURE post_tsvector_trigger();
         `);
   }
+
+  async anonymousUser() {
+    await pool.query(
+      `INSERT INTO users (username,email,password,verified) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+      [
+        process.env.ANONYMOUS_USER,
+        process.env.ANONYMOUS_EMAIL,
+        process.env.ANONYMOUS_PASSWORD,
+        true,
+      ]
+    );
+  }
 }
 
 module.exports = {
-  SetupFullTextSearch,
+  Migrations,
 };
