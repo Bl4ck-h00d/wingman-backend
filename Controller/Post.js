@@ -113,6 +113,14 @@ class PostController {
           await pool.query(postsSavedByUserQuery, [username])
         ).rows;
         data = [...data, { postsSaved: postsSavedByUserData }];
+
+        const anonymousPostsQuery =
+          "SELECT anonymousposts.postid FROM anonymousposts WHERE anonymousposts.author=$1";
+
+        const anonymousPostsByUserData = (
+          await pool.query(anonymousPostsQuery, [username])
+        ).rows;
+        data = [...data, { anonymousPostsByUser: anonymousPostsByUserData }];
       }
 
       return response.status(200).json(data);
@@ -231,6 +239,20 @@ class PostController {
         } else {
           data = [...data, { postSaved: true }];
         }
+
+        const anonymousPostsQuery =
+          "SELECT anonymousposts.postid FROM anonymousposts WHERE anonymousposts.author=$1";
+
+        const anonymousPostsByUserData = (
+          await pool.query(anonymousPostsQuery, [username])
+        ).rows[0];
+
+         if (!anonymousPostsByUserData) {
+           data = [...data, { anonymousPostsByUser: false }];
+         } else {
+           data = [...data, { anonymousPostsByUser: true }];
+         }
+       
       }
 
       const comments = await this.getComments(request, response);
