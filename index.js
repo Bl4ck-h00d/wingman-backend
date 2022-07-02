@@ -2,6 +2,7 @@ const express = require("express");
 require("dotenv").config();
 const AuthRoutes = require("./Routes/Auth");
 const PostRoutes = require("./Routes/Post");
+const UserRoutes = require("./Routes/User");
 var bodyParser = require("body-parser");
 var cors = require("cors");
 const { Migrations } = require("./Migration/migration");
@@ -15,6 +16,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(AuthRoutes);
 app.use(PostRoutes);
+app.use(UserRoutes);
 
 const PORT = process.env.PORT ?? 5000;
 

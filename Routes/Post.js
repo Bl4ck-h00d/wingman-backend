@@ -71,12 +71,14 @@ router.post("/api/save/:id", Authenticate, (request, response) => {
   Controller.savePost(request, response);
 });
 
-router.post("/api/search", GetToken,(request, response) => {
+router.post("/api/search", GetToken, (request, response) => {
   Controller.searchPost(request, response);
 });
 
 router.get("/api/tags", (request, response) => {
   Controller.getTags(request, response);
-})
+});
+
+
 
 module.exports = router;

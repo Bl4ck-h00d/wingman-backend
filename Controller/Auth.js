@@ -70,6 +70,7 @@ class AuthController {
       });
   }
 
+  
   async signIn(request, response) {
     const { email, password } = request.body;
 
@@ -81,9 +82,7 @@ class AuthController {
     const user = await (await pool.query(query, [email])).rows[0];
 
     if (!user) {
-      return response
-        .status(404)
-        .json({ msg: "Accout with this email does not exist" });
+      return response.status(404).json({ msg: "Invalid email or password" });
     }
 
     const verified = user.verified;
@@ -97,7 +96,7 @@ class AuthController {
     const isPasswordValid = await compare(password, hashedPassword);
 
     if (!isPasswordValid) {
-      return response.status(400).json({ msg: "Invalid password" });
+      return response.status(400).json({ msg: "Invalid email or password" });
     }
     const token_payload = {
       username: user.username,

@@ -2,7 +2,6 @@ const pool = require("../Config/Database");
 const { uploadFile, getFileStream } = require("../Config/S3");
 const fs = require("fs");
 const util = require("util");
-const { post, response } = require("../Routes/Post");
 const unlinkFile = util.promisify(fs.unlink);
 var moment = require("moment");
 require("dotenv").config();
@@ -204,6 +203,9 @@ class PostController {
 
       const post = (await pool.query(query, [postId])).rows;
 
+      if (post.length == 0) {
+        return response.status(404).json({ type: "error", msg: "Bad Request" });
+      }
       let data = [{ post: post }];
 
       //get the rating of the current post by current user
@@ -247,12 +249,11 @@ class PostController {
           await pool.query(anonymousPostsQuery, [username])
         ).rows[0];
 
-         if (!anonymousPostsByUserData) {
-           data = [...data, { anonymousPostsByUser: false }];
-         } else {
-           data = [...data, { anonymousPostsByUser: true }];
-         }
-       
+        if (!anonymousPostsByUserData) {
+          data = [...data, { anonymousPostsByUser: false }];
+        } else {
+          data = [...data, { anonymousPostsByUser: true }];
+        }
       }
 
       const comments = await this.getComments(request, response);

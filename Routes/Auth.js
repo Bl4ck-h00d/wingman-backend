@@ -2,6 +2,8 @@ const Router = require("express");
 const { AuthController } = require("../Controller/Auth");
 const { json } = require("body-parser");
 const { verify } = require("jsonwebtoken");
+const { GetToken } = require("../Middleware/GetToken");
+
 
 const router = Router();
 const Controller = new AuthController();
