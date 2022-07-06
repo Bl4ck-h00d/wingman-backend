@@ -5,18 +5,15 @@ const { sign, verify } = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 const { CLIENT_URL } = require("../Constants");
 const nodemailer = require("nodemailer");
-const xoauth2 = require("xoauth2");
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    type: "OAuth2",
-    user: process.env.GMAIL_EMAIL,
-    clientId: process.env.CLIENT_ID,
-    clientSecret: process.env.CLIENT_SECRET,
-    refreshToken: process.env.REFRESH_TOKEN,
-    accessToken: process.env.ACCESS_TOKEN,
-  },
-});
+const { google } = require("googleapis");
+
+const oAuth2Client = new google.auth.OAuth2(
+  process.env.CLIENT_ID,
+  process.env.CLIENT_SECRET,
+  "https://developers.google.com/oauthplayground"
+);
+
+oAuth2Client.setCredentials({ refresh_token: process.env.REFRESH_TOKEN });
 
 class AuthController {
   async signUp(request, response) {
@@ -49,6 +46,14 @@ class AuthController {
       return response.status(400).json({ msg: "This username already exists" });
     }
 
+    try {
+      this.sendVerificationEmail({ username, email });
+    } catch (error) {
+      return response
+        .status(500)
+        .json({ type: "error", msg: "An error occurred" });
+    }
+
     //Create User
     const query =
       "INSERT INTO users (username, email, password) VALUES ($1, $2, $3)";
@@ -58,8 +63,6 @@ class AuthController {
     pool
       .query(query, [username, email, hashedPassword])
       .then(() => {
-        this.sendVerificationEmail({ username, email }, transporter);
-
         return response
           .status(201)
           .json({ msg: "Account created succesfully" });
@@ -70,7 +73,6 @@ class AuthController {
       });
   }
 
-  
   async signIn(request, response) {
     const { email, password } = request.body;
 
@@ -110,7 +112,21 @@ class AuthController {
       .json({ token, username: user.username, email: user.email });
   }
 
-  sendVerificationEmail(user, transporter) {
+  async sendVerificationEmail(user) {
+    const accessToken = await oAuth2Client.getAccessToken();
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        type: "OAuth2",
+        user: process.env.GMAIL_EMAIL,
+        clientId: process.env.CLIENT_ID,
+        clientSecret: process.env.CLIENT_SECRET,
+        refreshToken: process.env.REFRESH_TOKEN,
+        accessToken: accessToken,
+      },
+    });
+
     const newId = uuidv4();
     const token_payload = {
       username: user.username,
@@ -124,17 +140,18 @@ class AuthController {
       {
         expiresIn: "1d",
       },
-      (err, emailToken) => {
+      async (err, emailToken) => {
         try {
           const emaiVerificationURL = `http://localhost:5000/verifyemail/${emailToken}`;
 
-          transporter.sendMail({
+          await transporter.sendMail({
             to: user.email,
             subject: "Confirm Email",
             html: `Please click this link to confirm your email: <a href="${emaiVerificationURL}">Here</a>`,
           });
         } catch (error) {
           console.log(error);
+          return response.status(500).json(error);
         }
       }
     );
