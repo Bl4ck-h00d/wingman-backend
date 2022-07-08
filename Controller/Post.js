@@ -4,6 +4,7 @@ const fs = require("fs");
 const util = require("util");
 const unlinkFile = util.promisify(fs.unlink);
 var moment = require("moment");
+const { auth } = require("google-auth-library");
 require("dotenv").config();
 
 class PostController {
@@ -419,8 +420,25 @@ class PostController {
       await unlinkFile(file.path);
     });
 
+    if (anonymous) {
+      const validityQuery = "SELECT author FROM anonymousposts WHERE postid=$1";
+
+      try {
+        const result = (await pool.query(validityQuery, [postId])).rows[0];
+
+        if (result.author !== author) {
+          return response.status(500).json({ msg: "INVALID OPERATION" });
+        }
+      } catch (error) {
+        console.log(error);
+        return response.status(500).json(error);
+      }
+    }
+
+    
+
     const query =
-      "UPDATE posts SET title=$1, description=$2, anonymous=$3, tags=$4, media=media||$5, edited=true WHERE posts.id=$6 AND author=$7";
+      "UPDATE posts SET title=$1, description=$2, anonymous=$3, tags=$4, media=media||$5, edited=true WHERE posts.id=$6";
 
     try {
       await pool.query(query, [
@@ -430,7 +448,6 @@ class PostController {
         tags,
         images,
         postId,
-        author,
       ]);
 
       //Update Tags table
